@@ -52,9 +52,7 @@ router.post("/", upload.single("image"), async (req, res) => {
 
   try {
     const newTourism = await tourism.save();
-    res
-      .status(201)
-      .json({ success: "Tourism data created successfully", data: newTourism });
+    res.status(201).json({ success: "Tourism data created successfully", data: newTourism });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -69,7 +67,7 @@ router.put("/:id", upload.single("image"), getTourism, async (req, res) => {
         fs.unlinkSync(path.join(__dirname, "..", res.tourism.image));
       } catch (err) {
         // Jika terjadi kesalahan saat menghapus file, lanjutkan saja tanpa menimbulkan kesalahan
-        // console.error("Error deleting old image file:", err.message);
+        console.error("Error deleting old image file:", err.message);
       }
       res.tourism.image = req.file.path;
     }
@@ -105,8 +103,7 @@ router.delete("/:id", getTourism, async (req, res) => {
     try {
       fs.unlinkSync(path.join(__dirname, "..", res.tourism.image));
     } catch (err) {
-      // Jika terjadi kesalahan saat menghapus file, lanjutkan saja tanpa menimbulkan kesalahan
-      // console.error("Error deleting image file:", err.message);
+      console.error("Error deleting image file:", err.message);
     }
     // Hapus data wisata
     await res.tourism.deleteOne({ _id: req.params.id });
