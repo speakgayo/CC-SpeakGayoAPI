@@ -1,16 +1,17 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  HiChartPie,
+  HiHome,
   HiOutlineLocationMarker,
-  HiChevronDown,
+  HiOutlineLogout,
 } from "react-icons/hi";
 
 export default function Sidebar({ isOpen, closeSidebar }) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const navigate = useNavigate();
 
-  const toggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+    window.location.reload();
   };
 
   return (
@@ -35,46 +36,29 @@ export default function Sidebar({ isOpen, closeSidebar }) {
                 className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
                 onClick={closeSidebar}
               >
-                <HiChartPie className="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" />
-                <span className="ms-3">Dashboard</span>
+                <HiHome className="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" />
+                <span className="ms-3">Home</span>
               </Link>
-            </li>
-            <li>
-              <button
-                onClick={toggleDropdown}
-                className="flex items-center w-full p-2 text-base text-gray-900 transition duration-75 rounded-lg group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
-              >
-                <HiOutlineLocationMarker className="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white" />
-                <span className="flex-1 ms-3 text-left rtl:text-right whitespace-nowrap">
-                  Tourism
-                </span>
-                <HiChevronDown />
-              </button>
-              <ul
-                className={`py-2 space-y-2 ${
-                  isDropdownOpen ? "block" : "hidden"
-                }`}
-              >
-                <li>
-                  <Link
-                    to="/tourism"
-                    className="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
-                    onClick={closeSidebar}
-                  >
-                    Tourism
-                  </Link>
-                </li>
-              </ul>
             </li>
             <li>
               <Link
-                to="/account"
+                to="/tourism"
                 className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
                 onClick={closeSidebar}
               >
-                <HiChartPie className="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" />
-                <span className="ms-3">Account</span>
+                <HiOutlineLocationMarker className="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" />
+                <span className="ms-3">Tourism</span>
               </Link>
+            </li>
+            <li>
+              <a
+                onClick={handleLogout}
+                className="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
+                style={{ cursor: "pointer" }}
+              >
+                <HiOutlineLogout className="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" />
+                <span className="ms-3">Sign out</span>
+              </a>
             </li>
           </ul>
         </div>

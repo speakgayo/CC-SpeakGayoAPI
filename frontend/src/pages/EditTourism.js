@@ -8,6 +8,7 @@ import { HiCloudUpload, HiX } from "react-icons/hi";
 import axios from "axios";
 
 export default function UpdateTourism() {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL;
   const { id } = useParams();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -21,8 +22,8 @@ export default function UpdateTourism() {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-
   const [showModal, setShowModal] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const handleShowModal = (event) => {
     event.preventDefault(); // Jangan lupa untuk menghentikan perilaku bawaan dari tombol "Save"
@@ -36,7 +37,7 @@ export default function UpdateTourism() {
   useEffect(() => {
     async function fetchTourismData() {
       try {
-        const response = await axios.get(`http://localhost:5000/tourism/${id}`);
+        const response = await axios.get(`${apiUrl}/tourism/${id}`);
         const { name, category, address, description, image } = response.data;
         setName(name);
         setCategory(category);
@@ -45,10 +46,19 @@ export default function UpdateTourism() {
         setImageUrl(image);
       } catch (error) {
         console.error("Error fetching tourism data:", error);
+        // Check if the error is due to resource not found (404)
+        if (error.response && error.response.status === 404) {
+          // Redirect to NotFound page
+          navigate("/NotFound"); // Assuming '/NotFound' is your route for the Not Found page
+        } else {
+          // Handle other errors as needed
+          navigate("/NotFound");
+          setErrorMessage("Failed to fetch tourism data.");
+        }
       }
     }
     fetchTourismData();
-  }, [id]);
+  }, [id, navigate]);
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -60,6 +70,7 @@ export default function UpdateTourism() {
         setImageUrl(URL.createObjectURL(file));
         setLoading(false);
       }, 2000); // Simulate a loading delay
+      setFieldErrors((prevErrors) => ({ ...prevErrors, image: "" }));
     }
   };
 
@@ -79,27 +90,67 @@ export default function UpdateTourism() {
     setFileName("");
   };
 
+  const handleInputChange = (field, value) => {
+    switch (field) {
+      case "name":
+        setName(value);
+        break;
+      case "category":
+        setCategory(value);
+        break;
+      case "address":
+        setAddress(value);
+        break;
+      case "description":
+        setDescription(value);
+        break;
+      case "image":
+        setImage(value);
+        break;
+      default:
+        break;
+    }
+    setFieldErrors((prevErrors) => ({ ...prevErrors, [field]: "" }));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
+
+    // Validation
+    const errors = {};
+    if (!name) errors.name = "Name Tourism is required";
+    if (!category) errors.category = "Category is required";
+    if (!address) errors.address = "Address is required";
+    if (!description) errors.description = "Description is required";
+
+    // Check if image is required (when no existing image or no image value from GET)
+    if (!imageUrl && !image) {
+      errors.image = "Image is required";
+    }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setIsSubmitting(false);
+      return;
+    }
 
     const formData = new FormData();
     formData.append("name", name);
     formData.append("category", category);
     formData.append("address", address);
     formData.append("description", description);
-    formData.append("image", image);
+    if (image) {
+      formData.append("image", image);
+    }
 
     try {
-      const response = await axios.put(
-        `http://localhost:5000/tourism/${id}`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await axios.put(`${apiUrl}/tourism/${id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       if (response.status === 200) {
         setShowModal(false);
         localStorage.setItem("successMessage", response.data.success);
@@ -115,7 +166,7 @@ export default function UpdateTourism() {
         setErrorMessage("Failed to update tourism.");
       }
     } finally {
-      setIsSubmitting(false); // Selesai proses pengiriman
+      setIsSubmitting(false); // Finish submission process
     }
   };
 
@@ -123,7 +174,7 @@ export default function UpdateTourism() {
     <Layout>
       <Breadcrumb aria-label="Default breadcrumb example" className="pb-4">
         <HiHome className="mr-2 text-xl" />
-        <Link to="/">Dashboard</Link>
+        <Link to="/">Home</Link>
         <Breadcrumb.Item>
           <Link to="/tourism">Tourism</Link>
         </Breadcrumb.Item>
@@ -161,7 +212,11 @@ export default function UpdateTourism() {
           <div className="col-span-2 sm:col-span-1">
             <label
               htmlFor="name"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+              className={`block mb-2 text-sm font-medium ${
+                fieldErrors.name
+                  ? "text-red-700 dark:text-red-500"
+                  : "text-gray-900 dark:text-white"
+              }`}
             >
               Name Tourism
             </label>
@@ -169,36 +224,63 @@ export default function UpdateTourism() {
               type="text"
               name="name"
               id="name"
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+              className={`bg-gray-50 border ${
+                fieldErrors.name
+                  ? "border-red-500 text-red-900 placeholder-red-700 dark:placeholder-red-400 focus:ring-red-500 dark:bg-gray-600 focus:border-red-500 block w-full p-2.5 dark:text-white dark:focus:ring-red-500 dark:focus:border-red-500"
+                  : "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-cyan-600 focus:border-cyan-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-cyan-500 dark:focus:border-cyan-500"
+              } text-sm rounded-lg`}
               placeholder="Type tourism name"
-              required
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleInputChange("name", e.target.value)}
             />
+            {fieldErrors.name && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-500">
+                <span className="font-medium">Oh, snapp!</span>{" "}
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
           <div className="col-span-2 sm:col-span-1">
             <label
               htmlFor="category"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+              className={`block mb-2 text-sm font-medium ${
+                fieldErrors.category
+                  ? "text-red-700 dark:text-red-500"
+                  : "text-gray-900 dark:text-white"
+              }`}
             >
               Category
             </label>
             <select
               id="category"
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+              className={`bg-gray-50 border ${
+                fieldErrors.category
+                  ? "border-red-500 text-red-900 placeholder-red-700 dark:placeholder-red-400 focus:ring-red-500 dark:bg-gray-600 focus:border-red-500 block w-full p-2.5 dark:text-white dark:focus:ring-red-500 dark:focus:border-red-500"
+                  : "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-cyan-600 focus:border-cyan-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-cyan-500 dark:focus:border-cyan-500"
+              } text-sm rounded-lg`}
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => handleInputChange("category", e.target.value)}
             >
               <option value="">Select category</option>
               <option value="Natural Tourism">Natural Tourism</option>
               <option value="Food">Food</option>
               <option value="Place of Worship">Place of Worship</option>
             </select>
+            {fieldErrors.category && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-500">
+                <span className="font-medium">Oh, snapp!</span>{" "}
+                {fieldErrors.category}
+              </p>
+            )}
           </div>
           <div className="col-span-2">
             <label
               htmlFor="address"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+              className={`block mb-2 text-sm font-medium ${
+                fieldErrors.address
+                  ? "text-red-700 dark:text-red-500"
+                  : "text-gray-900 dark:text-white"
+              }`}
             >
               Address
             </label>
@@ -206,34 +288,60 @@ export default function UpdateTourism() {
               type="text"
               name="address"
               id="address"
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+              className={`bg-gray-50 border ${
+                fieldErrors.address
+                  ? "border-red-500 text-red-900 placeholder-red-700 dark:placeholder-red-400 focus:ring-red-500 dark:bg-gray-600 focus:border-red-500 block w-full p-2.5 dark:text-white dark:focus:ring-red-500 dark:focus:border-red-500"
+                  : "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-cyan-600 focus:border-cyan-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-cyan-500 dark:focus:border-cyan-500"
+              } text-sm rounded-lg`}
               placeholder="Type address"
-              required
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(e) => handleInputChange("address", e.target.value)}
             />
+            {fieldErrors.address && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-500">
+                <span className="font-medium">Oh, snapp!</span>{" "}
+                {fieldErrors.address}
+              </p>
+            )}
           </div>
           <div className="col-span-2 sm:col-span-1">
             <label
               htmlFor="description"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+              className={`block mb-2 text-sm font-medium ${
+                fieldErrors.description
+                  ? "text-red-700 dark:text-red-500"
+                  : "text-gray-900 dark:text-white"
+              }`}
             >
               Description
             </label>
             <textarea
               id="description"
-              rows={4}
-              className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              placeholder="Write description here"
-              required
+              rows="4"
+              className={`bg-gray-50 border ${
+                fieldErrors.description
+                  ? "border-red-500 text-red-900 placeholder-red-700 dark:placeholder-red-400 focus:ring-red-500 dark:bg-gray-600 focus:border-red-500 block w-full p-2.5 dark:text-white dark:focus:ring-red-500 dark:focus:border-red-500"
+                  : "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-cyan-600 focus:border-cyan-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-cyan-500 dark:focus:border-cyan-500"
+              } text-sm rounded-lg`}
+              placeholder="Type description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+              onChange={(e) => handleInputChange("description", e.target.value)}
+            ></textarea>
+            {fieldErrors.description && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-500">
+                <span className="font-medium">Oh, snapp!</span>{" "}
+                {fieldErrors.description}
+              </p>
+            )}
           </div>
           <div className="col-span-2 sm:col-span-1">
             <label
               htmlFor="image"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+              className={`block mb-2 text-sm font-medium ${
+                fieldErrors.image
+                  ? "text-red-700 dark:text-red-500"
+                  : "text-gray-900 dark:text-white"
+              }`}
             >
               Upload Image
             </label>
@@ -241,18 +349,38 @@ export default function UpdateTourism() {
               {!imageUrl && !loading ? (
                 <Label
                   htmlFor="dropzone-file"
-                  className="flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+                  className={`flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed ${
+                    fieldErrors.image
+                      ? "border-red-500 bg-gray-50 dark:border-red-500 dark:bg-gray-600"
+                      : "border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700"
+                  } hover:bg-gray-100 dark:hover:border-gray-500 dark:hover:bg-gray-600`}
                 >
                   <div className="flex flex-col items-center justify-center pb-6 pt-5">
                     <HiCloudUpload
                       size={40}
-                      className="text-gray-500 dark:text-gray-400"
+                      className={`text-${
+                        fieldErrors.image
+                          ? "red-500 dark:text-red-400"
+                          : "gray-500 dark:text-gray-400"
+                      }`}
                     />
-                    <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                    <p
+                      className={`mb-2 text-sm ${
+                        fieldErrors.image
+                          ? "text-red-500 dark:text-red-400"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
                       <span className="font-semibold">Click to upload</span> or
                       drag and drop
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p
+                      className={`text-xs ${
+                        fieldErrors.image
+                          ? "text-red-500 dark:text-red-400"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
                       PNG, JPG or GIF up to 5MB
                     </p>
                   </div>
@@ -291,13 +419,12 @@ export default function UpdateTourism() {
                   <img
                     src={
                       imageUrl && !imageUrl.startsWith("blob:")
-                        ? `http://localhost:5000/${imageUrl}`
+                        ? `${imageUrl}`
                         : imageUrl
                     }
                     alt="Preview"
                     className="h-64 w-full object-cover rounded-lg"
                   />
-
                   <button
                     type="button"
                     className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-2"
@@ -311,6 +438,12 @@ export default function UpdateTourism() {
                 </div>
               )}
             </div>
+            {fieldErrors.image && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-500">
+                <span className="font-medium">Oh, snapp!</span>{" "}
+                {fieldErrors.image}
+              </p>
+            )}
           </div>
           <div className="col-span-2 flex justify-start space-x-3">
             <button
@@ -417,7 +550,7 @@ export default function UpdateTourism() {
                   onClick={handleCloseModal}
                   data-modal-hide="popup-modal"
                   type="button"
-                  className="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+                  className="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-cyan-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
                 >
                   No, cancel
                 </button>

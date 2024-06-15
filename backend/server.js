@@ -1,12 +1,23 @@
-// server.js
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import tourismRoutes from "./routes/tourism.js";
 import authRoutes from "./routes/auth.js";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
+import { Storage } from "@google-cloud/storage";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Konfigurasi Google Cloud Storage
+const storage = new Storage({
+  keyFilename: path.join(__dirname, "../service_account.json"),
+});
+const bucket = storage.bucket("tourism-image");
 
 const app = express();
 const port = process.env.PORT || 5000;

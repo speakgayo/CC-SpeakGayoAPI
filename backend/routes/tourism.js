@@ -1,115 +1,184 @@
-import { fileURLToPath } from "url";
 import express from "express";
 import multer from "multer";
 import Tourism from "../models/Tourism.js";
-import fs from "fs";
+import { Storage } from "@google-cloud/storage";
 import path from "path";
+import crypto from "crypto";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
+// Konfigurasi Google Cloud Storage
+const storage = new Storage({
+  keyFilename: path.join(__dirname, "../service_account.json"),
+});
+const bucket = storage.bucket("tourism-image");
+
+// Konfigurasi multer
+const upload = multer({
+  storage: multer.memoryStorage(), // Simpan di memori sementara
 });
 
-const upload = multer({ storage: storage });
-
-// Get all tourism data
+// Rute untuk mengambil semua data tourism
 router.get("/", async (req, res) => {
   try {
-    const tourism = await Tourism.find();
-    res.json(tourism);
+    const tourismData = await Tourism.find();
+    res.status(200).json(tourismData);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get single tourism data by ID
-router.get("/:id", getTourism, (req, res) => {
-  res.json(res.tourism);
+router.get("/:id", async (req, res) => {
+  try {
+    const tourism = await Tourism.findById(req.params.id);
+    if (!tourism) {
+      return res.status(404).json({ error: "Cannot find tourism" });
+    }
+    res.status(200).json(tourism);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Create a new tourism data
+// Upload single image
 router.post("/", upload.single("image"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No image file uploaded" });
   }
 
-  const tourism = new Tourism({
-    name: req.body.name,
-    category: req.body.category,
-    address: req.body.address,
-    description: req.body.description,
-    image: req.file.path,
+  // Membuat nama file unik
+  const hash = crypto
+    .createHash("md5")
+    .update(Date.now().toString())
+    .digest("hex");
+  const ext = path.extname(req.file.originalname);
+  const filename = `${hash}${ext}`;
+
+  // Upload ke GCS
+  const blob = bucket.file(filename);
+  const blobStream = blob.createWriteStream({
+    resumable: false,
   });
 
-  try {
-    const newTourism = await tourism.save();
-    res
-      .status(201)
-      .json({ success: "Tourism data created successfully", data: newTourism });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  blobStream.on("error", (err) => {
+    res.status(500).json({ error: err.message });
+  });
+
+  blobStream.on("finish", async () => {
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+
+    const tourism = new Tourism({
+      name: req.body.name,
+      category: req.body.category,
+      address: req.body.address,
+      description: req.body.description,
+      image: publicUrl,
+    });
+
+    try {
+      const newTourism = await tourism.save();
+      res.status(201).json({
+        success: "Tourism data created successfully",
+        data: newTourism,
+      });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  blobStream.end(req.file.buffer);
 });
 
-// Update a tourism data
+// Update tourism data
 router.put("/:id", upload.single("image"), getTourism, async (req, res) => {
   try {
-    // Menghapus file lama jika ada file baru diunggah
     if (req.file) {
-      try {
-        fs.unlinkSync(path.join(__dirname, "..", res.tourism.image));
-      } catch (err) {
-        // Jika terjadi kesalahan saat menghapus file, lanjutkan saja tanpa menimbulkan kesalahan
-        // console.error("Error deleting old image file:", err.message);
+      // Hapus gambar lama dari GCS
+      const oldImage = res.tourism.image;
+      if (oldImage) {
+        const oldFilename = oldImage.split("/").pop();
+        await bucket
+          .file(oldFilename)
+          .delete()
+          .catch(() => {});
       }
-      res.tourism.image = req.file.path;
-    }
 
-    // Memperbarui properti yang diperlukan
-    if (req.body.name != null) {
-      res.tourism.name = req.body.name;
-    }
-    if (req.body.category != null) {
-      res.tourism.category = req.body.category;
-    }
-    if (req.body.address != null) {
-      res.tourism.address = req.body.address;
-    }
-    if (req.body.description != null) {
-      res.tourism.description = req.body.description;
-    }
+      // Upload gambar baru ke GCS
+      const hash = crypto
+        .createHash("md5")
+        .update(Date.now().toString())
+        .digest("hex");
+      const ext = path.extname(req.file.originalname);
+      const filename = `${hash}${ext}`;
+      const blob = bucket.file(filename);
+      const blobStream = blob.createWriteStream({
+        resumable: false,
+      });
 
-    // Menyimpan data wisata yang diperbarui
-    const updatedTourism = await res.tourism.save();
-    res.json({
-      success: "Tourism data updated successfully",
-      data: updatedTourism,
-    });
+      blobStream.on("error", (err) => {
+        res.status(500).json({ error: err.message });
+      });
+
+      blobStream.on("finish", async () => {
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+        res.tourism.image = publicUrl;
+
+        if (req.body.name != null) res.tourism.name = req.body.name;
+        if (req.body.category != null) res.tourism.category = req.body.category;
+        if (req.body.address != null) res.tourism.address = req.body.address;
+        if (req.body.description != null)
+          res.tourism.description = req.body.description;
+
+        try {
+          const updatedTourism = await res.tourism.save();
+          res.json({
+            success: "Tourism data updated successfully",
+            data: updatedTourism,
+          });
+        } catch (err) {
+          res.status(400).json({ error: err.message });
+        }
+      });
+
+      blobStream.end(req.file.buffer);
+    } else {
+      if (req.body.name != null) res.tourism.name = req.body.name;
+      if (req.body.category != null) res.tourism.category = req.body.category;
+      if (req.body.address != null) res.tourism.address = req.body.address;
+      if (req.body.description != null)
+        res.tourism.description = req.body.description;
+
+      try {
+        const updatedTourism = await res.tourism.save();
+        res.json({
+          success: "Tourism data updated successfully",
+          data: updatedTourism,
+        });
+      } catch (err) {
+        res.status(400).json({ error: err.message });
+      }
+    }
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// Delete a tourism data
+// Delete tourism data
 router.delete("/:id", getTourism, async (req, res) => {
   try {
-    try {
-      fs.unlinkSync(path.join(__dirname, "..", res.tourism.image));
-    } catch (err) {
-      // Jika terjadi kesalahan saat menghapus file, lanjutkan saja tanpa menimbulkan kesalahan
-      // console.error("Error deleting image file:", err.message);
+    const oldImage = res.tourism.image;
+    if (oldImage) {
+      const oldFilename = oldImage.split("/").pop();
+      await bucket
+        .file(oldFilename)
+        .delete()
+        .catch(() => {});
     }
-    // Hapus data wisata
-    await res.tourism.deleteOne({ _id: req.params.id });
+    await res.tourism.deleteOne();
     res.json({ success: "Tourism data deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -127,7 +196,6 @@ async function getTourism(req, res, next) {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
-
   res.tourism = tourism;
   next();
 }

@@ -1,15 +1,25 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { Flowbite, DarkThemeToggle } from "flowbite-react";
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+} from "react-router-dom";
+import { Flowbite } from "flowbite-react";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
-import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home";
 import Tourism from "./pages/Tourism";
 import AddTourism from "./pages/AddTourism";
 import EditTourism from "./pages/EditTourism";
 import Account from "./pages/Account";
+import Login from "./pages/Login";
+import NotFound from "./pages/NotFound"; // Import your 404 page component
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    !!localStorage.getItem("token")
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
 
@@ -26,25 +36,67 @@ function App() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  const setAuth = (authStatus) => {
+    setIsAuthenticated(authStatus);
+  };
+
   return (
     <Flowbite theme={{ mode: theme }}>
       <Router>
         <div className="relative">
-          <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-          <Sidebar isOpen={isSidebarOpen} closeSidebar={closeSidebar} />
-          <div onClick={closeSidebar}>
+          {isAuthenticated && (
+            <>
+              <Header
+                toggleSidebar={toggleSidebar}
+                isSidebarOpen={isSidebarOpen}
+                theme={theme}
+                setTheme={setTheme}
+              />
+              <Sidebar isOpen={isSidebarOpen} closeSidebar={closeSidebar} />
+            </>
+          )}
+          <div onClick={closeSidebar} className={isAuthenticated ? "p-0" : ""}>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/tourism" element={<Tourism />} />
-              <Route path="/add_tourism" element={<AddTourism />} />
-              <Route path="/edit_tourism/:id" element={<EditTourism />} />
-              <Route path="/account" element={<Account />} />
+              <Route
+                path="/login"
+                element={
+                  isAuthenticated ? (
+                    <Navigate to="/" />
+                  ) : (
+                    <Login setAuth={setAuth} />
+                  )
+                }
+              />
+              <Route
+                path="/"
+                element={isAuthenticated ? <Home /> : <Navigate to="/login" />}
+              />
+              <Route
+                path="/tourism"
+                element={
+                  isAuthenticated ? <Tourism /> : <Navigate to="/login" />
+                }
+              />
+              <Route
+                path="/add_tourism"
+                element={
+                  isAuthenticated ? <AddTourism /> : <Navigate to="/login" />
+                }
+              />
+              <Route
+                path="/edit_tourism/:id"
+                element={
+                  isAuthenticated ? <EditTourism /> : <Navigate to="/login" />
+                }
+              />
+              <Route
+                path="/account"
+                element={
+                  isAuthenticated ? <Account /> : <Navigate to="/login" />
+                }
+              />
+              <Route path="*" element={<NotFound />} />
             </Routes>
-          </div>
-          <div className="fixed bottom-4 right-4">
-            <DarkThemeToggle
-              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            />
           </div>
         </div>
       </Router>

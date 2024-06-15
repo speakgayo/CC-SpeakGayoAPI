@@ -1,0 +1,38 @@
+/* Add transitions for fading effect */
+.fade-in {
+  animation: fadeIn 0.25s forwards;
+}
+
+.fade-out {
+  animation: fadeOut 0.25s forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Mobile first styling */
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+/* Medium screens and up */
+@media (min-width: 768px) {
+  .flex-nowrap {
+    flex-wrap: nowrap;
+  }
+}
